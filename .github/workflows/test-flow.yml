@@ -1,0 +1,59 @@
+name: CI/CD Deployment Flow
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  # Job 1: Build the code (The "Artifact" creator)
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Application
+        run: |
+          echo "Compiling code..."
+          echo "creating-artifact-123" > build-output.txt
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: function-app-package
+          path: build-output.txt
+
+  # Job 2: Deploy to Test (Automatic)
+  deploy-test:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: Test
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: function-app-package
+
+      - name: Deploy to Test Azure Function
+        run: echo "Deploying to Test Function App... Done!"
+
+  # Job 3: Deploy to Prod (Pauses for Approval)
+  deploy-prod:
+    needs: deploy-test
+    runs-on: ubuntu-latest
+    # This environment name must match the one in your Repo Settings to trigger the pause
+    environment: Production 
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: function-app-package
+
+      - name: Deploy to Prod Azure Function Slot
+        run: echo "Deploying to Production Staging Slot..."
+
+      - name: Swap Slots
+        run: echo "Swapping Staging to Production. Release Live!"
+
+      - name: Create Release Version
+        run: echo "Tagging version v1.0.${{ github.run_number }}"
