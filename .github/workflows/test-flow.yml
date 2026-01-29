@@ -1,59 +1,59 @@
-name: CI/CD Deployment Flow
+name: CI/CD with Auto-Changelog Release
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  # Job 1: Build the code (The "Artifact" creator)
   build:
     runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_gen.outputs.tag }}
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+      
+      - name: Generate Tag
+        id: tag_gen
+        # Using a date + run_number format for a clean versioning look
+        run: echo "tag=$(date +'%Y.%m').${{ github.run_number }}" >> $GITHUB_OUTPUT
 
-      - name: Build Application
-        run: |
-          echo "Compiling code..."
-          echo "creating-artifact-123" > build-output.txt
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: function-app-package
-          path: build-output.txt
-
-  # Job 2: Deploy to Test (Automatic)
   deploy-test:
     needs: build
     runs-on: ubuntu-latest
     environment: Test
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: function-app-package
+      - name: Deploy to Test
+        run: echo "Deploying version ${{ needs.build.outputs.new_tag }} to Test..."
 
-      - name: Deploy to Test Azure Function
-        run: echo "Deploying to Test Function App... Done!"
-
-  # Job 3: Deploy to Prod (Pauses for Approval)
   deploy-prod:
-    needs: deploy-test
+    needs: [build, deploy-test]
     runs-on: ubuntu-latest
-    # This environment name must match the one in your Repo Settings to trigger the pause
-    environment: Production 
+    environment: Production
+    permissions:
+      contents: write
+      pull-requests: read # Required to gather PR titles for the changelog
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          name: function-app-package
+          fetch-depth: 0 # Fetches all history so it can compare tags
 
-      - name: Deploy to Prod Azure Function Slot
-        run: echo "Deploying to Production Staging Slot..."
+      - name: Deploy to Prod
+        run: echo "Deploying version ${{ needs.build.outputs.new_tag }} to Production..."
 
-      - name: Swap Slots
-        run: echo "Swapping Staging to Production. Release Live!"
-
-      - name: Create Release Version
-        run: echo "Tagging version v1.0.${{ github.run_number }}"
+      # 1. This step generates the markdown list of changes
+      - name: Generate Release Notes
+        id: release_notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.new_tag }}
+          name: Release v${{ needs.build.outputs.new_tag }}
+          generate_release_notes: true # This is the magic toggle
+          body: |
+            ## What's Changed in this Release
+            *Manual approval granted by ${{ github.actor }}*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
