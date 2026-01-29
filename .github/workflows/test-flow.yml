@@ -21,13 +21,22 @@ jobs:
         run: echo "Fake it till you make it"
 
   # Job 2: Deploy to Beta (Automatic after tests pass)
-  deploy-beta:
+deploy-beta:
     needs: build-and-test
     runs-on: ubuntu-latest
     environment: Test
+    permissions:
+      contents: write
     steps:
-      - name: Deploy to Beta Function App
-        run: echo "Syncing code to Beta Slot. Version 1.5.${{ github.run_number }} is now live for testing."
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create Beta Tag
+        run: |
+          git tag beta-v1.5.${{ github.run_number }}
+          git push origin beta-v1.5.${{ github.run_number }}
+      - name: Deploy to Beta
+        run: echo "Updating Beta site..."
+        
 
   # Job 3: Integration Testing (Simulating Smoke Tests on the Beta site)
   smoke-test-beta:
