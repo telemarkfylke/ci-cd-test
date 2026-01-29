@@ -1,59 +1,79 @@
-name: CI/CD with Auto-Changelog Release
+name: Production Grade Function App Flow
 
 on:
   push:
     branches: [ "main" ]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    outputs:
-      new_tag: ${{ steps.tag_gen.outputs.tag }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Generate Tag
-        id: tag_gen
-        # Using a date + run_number format for a clean versioning look
-        run: echo "tag=$(date +'%Y.%m').${{ github.run_number }}" >> $GITHUB_OUTPUT
+# Automatically cancels older runs if you push again before they finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true 
 
-  deploy-test:
-    needs: build
+jobs:
+  # Job 1: Build & Unit Testing
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Environment (Node/Python/C#)
+        run: echo "Setting up language runtime..."
+
+      - name: Install Dependencies
+        run: echo "npm install OR pip install..."
+
+      - name: Run Unit Tests
+        id: run_tests
+        run: |
+          echo "Running 42 test cases..."
+          echo "Test 1: Auth Module - PASSED"
+          echo "Test 2: Database Connection - PASSED"
+          echo "Test 3: Azure Blob Trigger - PASSED"
+          echo "Tests finished with 0 failures."
+
+      - name: Run Linting
+        run: echo "Checking code style... No issues found."
+
+  # Job 2: Deploy to Beta (Automatic after tests pass)
+  deploy-beta:
+    needs: build-and-test
     runs-on: ubuntu-latest
     environment: Test
     steps:
-      - name: Deploy to Test
-        run: echo "Deploying version ${{ needs.build.outputs.new_tag }} to Test..."
+      - name: Deploy to Beta Function App
+        run: echo "Syncing code to Beta Slot. Version 1.5.${{ github.run_number }} is now live for testing."
 
-  deploy-prod:
-    needs: [build, deploy-test]
+  # Job 3: Integration Testing (Simulating Smoke Tests on the Beta site)
+  smoke-test-beta:
+    needs: deploy-beta
     runs-on: ubuntu-latest
-    environment: Production
+    steps:
+      - name: Run Smoke Tests against Beta URL
+        run: |
+          echo "Pinging Beta endpoint..."
+          echo "HTTP 200 OK received."
+          echo "Integration tests passed."
+
+  # Job 4: Promote to Production (Manual Approval required)
+  deploy-prod:
+    needs: smoke-test-beta
+    runs-on: ubuntu-latest
+    environment: Production # The "Approve" button
     permissions:
-      contents: write
-      pull-requests: read # Required to gather PR titles for the changelog
+      contents: write # Needed for tagging and releasing
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetches all history so it can compare tags
+          fetch-depth: 0
 
-      - name: Deploy to Prod
-        run: echo "Deploying version ${{ needs.build.outputs.new_tag }} to Production..."
+      - name: Swap Staging to Production
+        run: echo "Executing Azure Slot Swap... Production is now updated."
 
-      # 1. This step generates the markdown list of changes
-      - name: Generate Release Notes
-        id: release_notes
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.new_tag }}
-          name: Release v${{ needs.build.outputs.new_tag }}
-          generate_release_notes: true # This is the magic toggle
-          body: |
-            ## What's Changed in this Release
-            *Manual approval granted by ${{ github.actor }}*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: v1.5.${{ github.run_number }}
+          name: Release v1.5.${{ github.run_number }}
+          generate_release_notes: true # Auto-creates your changelog
