@@ -1,0 +1,23 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag to roll back to (e.g., v1.4.0)'
+        required: true
+
+jobs:
+  rollback-prod:
+    runs-on: ubuntu-latest
+    environment: Production # Still keep approval here for safety!
+    steps:
+      - name: Checkout specific tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Deploy to Production
+        run: |
+          echo "🚨 ROLLING BACK to ${{ github.event.inputs.version }}"
+          echo "Deploying code from this tag to Azure..."
