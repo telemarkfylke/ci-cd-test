@@ -39,7 +39,7 @@ jobs:
         
 
   # Job 3: Integration Testing (Simulating Smoke Tests on the Beta site)
-  smoke-test-beta:
+  integration-test-beta:
     needs: deploy-beta
     runs-on: ubuntu-latest
     steps:
