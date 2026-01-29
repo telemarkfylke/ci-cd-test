@@ -3,21 +3,42 @@ name: Emergency Rollback
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Tag to roll back to (e.g., v1.4.0)'
+      tag_to_deploy:
+        description: 'The version tag to redeploy (e.g., v1.5.10)'
         required: true
 
 jobs:
-  rollback-prod:
+  rollback:
     runs-on: ubuntu-latest
-    environment: Production # Still keep approval here for safety!
+    environment: Production
+    permissions:
+      contents: write # Needed to update the "Latest" release badge
     steps:
-      - name: Checkout specific tag
+      - name: Checkout Specific Version
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.version }}
+          ref: ${{ github.event.inputs.tag_to_deploy }}
 
-      - name: Deploy to Production
+      - name: Re-Deploy to Production
         run: |
-          echo "🚨 ROLLING BACK to ${{ github.event.inputs.version }}"
-          echo "Deploying code from this tag to Azure..."
+          echo "🚨 ROLLING BACK TO VERSION ${{ github.event.inputs.tag_to_deploy }}"
+          # Add your Azure deployment command here
+
+      # This moves the "Latest" badge in the UI back to the old tag
+      - name: Update Latest Release Label
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_to_deploy }}
+          make_latest: true 
+
+      # Adds a comment to the specific commit so the history shows the rollback
+      - name: Post Rollback Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: "⚠️ This version was manually deployed as a Rollback on " + new Date().toLocaleString()
+            })
