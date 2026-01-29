@@ -51,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 #Full historikk og alle tags, trengs for versjonering og rollback features
 
       - name: Swap Staging to Production
         run: echo "Executing Azure Slot Swap... Production is now updated."
