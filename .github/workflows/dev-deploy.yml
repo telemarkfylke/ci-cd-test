@@ -1,0 +1,50 @@
+name: Dev Branch Continuous Deployment
+
+on:
+  push:
+    branches: [ "dev" ]
+
+# Keeps the dev environment tidy by canceling older runs if you push rapidly
+concurrency:
+  group: dev-workflow-${{ github.ref }}
+  cancel-in-progress: true 
+
+jobs:
+  # Job 1: Build and Run Fake Tests
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: echo "npm install --include=dev"
+
+      - name: Run Unit Tests
+        run: |
+          echo "Running Dev-specific test suite..."
+          echo "Test: Environment Config Check - PASSED"
+          echo "Test: Mock API Response - PASSED"
+          echo "All 12 local tests passed."
+
+  # Job 2: Deploy to Dev (Immediate)
+  deploy-dev:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: Development # No protection rules/approvals set here
+    steps:
+      - name: Deploy to Azure Dev Slot
+        run: |
+          echo "Deploying latest commit from dev branch..."
+          echo "Azure Function (Dev) is being updated..."
+          echo "Deployment successful."
+
+  # Job 3: Quick Verify
+  verify-dev:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health Check
+        run: |
+          echo "Checking https://dev-myapp.azurewebsites.net/api/health"
+          echo "Status: 200 OK"
