@@ -51,7 +51,7 @@ jobs:
 
   # Job 4: Promote to Production (Manual Approval required)
   deploy-prod:
-    needs: smoke-test-beta
+    needs: deploy-beta
     runs-on: ubuntu-latest
     environment: Production # The "Approve" button
     permissions:
